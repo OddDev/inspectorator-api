@@ -3,16 +3,21 @@ var router = express.Router()
 var request = require('request')
 
 const _randomTrueFalse = () => Math.random() < 0.5
-const _dateIn12Hours = () => {
-  const currentDate = new Date()
-  currentDate.setHours(currentDate.getHours() + 12)
-  return currentDate
-}
 
-let jsWebToken = {
-  bearerToken: process.env.START_TOKEN,
-  expirationDate: _dateIn12Hours()
-}
+let bearerToken = process.env.START_TOKEN
+
+// Getting that token in eighteen hours again
+setInterval(() => {
+  request.get('https://api.thetvdb.com/refresh_token', {
+    'auth': {
+      'bearer': bearerToken
+    }
+  }, (error, response, body) => {
+    if (!error && response.statusCode === 200) {
+      bearerToken = JSON.parse(body).token
+    }
+  })
+}, 18 * 60 * 60 * 1000)
 
 let firstPage = _randomTrueFalse()
 
@@ -26,23 +31,9 @@ const _getPage = () => {
 const _randomElementFromArray = sourceArray => sourceArray[Math.floor(Math.random() * sourceArray.length)]
 
 router.get('/random/', function (req, res, next) {
-  if (jsWebToken.expirationDate.getTime() >= new Date().getTime()) {
-    request.get('https://api.thetvdb.com/refresh_token', {
-      'auth': {
-        'bearer': jsWebToken.bearerToken
-      }
-    }, (error, response, body) => {
-      if (!error && response.statusCode === 200) {
-        jsWebToken = {
-          bearerToken: JSON.parse(body).token,
-          expirationDate: _dateIn12Hours()
-        }
-      }
-    })
-  }
   request.get('https://api.thetvdb.com/series/76846/episodes/query?page=' + _getPage(), {
     'auth': {
-      'bearer': jsWebToken.bearerToken
+      'bearer': bearerToken
     },
     headers: {
       'Accept-Language': 'DE'
